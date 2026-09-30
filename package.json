@@ -25,7 +25,7 @@
   "scripts": {
     "build": "npm run build -w @hero-factory/contracts && npm run build -w @hero-factory/api && npm run build -w @hero-factory/web",
     "dev": "npm run build -w @hero-factory/contracts && concurrently -n contracts,api,web -c cyan,magenta,blue \"npm run dev -w @hero-factory/contracts\" \"npm run dev -w @hero-factory/api\" \"npm run dev -w @hero-factory/web\"",
-    "lint": "eslint .",
+    "lint": "npm run prepare:codegen && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare:codegen": "npm run build -w @hero-factory/contracts && npm run db:generate -w @hero-factory/api",
