@@ -1,0 +1,50 @@
+{
+  "name": "hero-factory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.17.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "@prisma/adapter-mariadb": {
+      "mariadb": "3.5.4"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.5"
+    }
+  },
+  "scripts": {
+    "build": "npm run build -w @hero-factory/contracts && npm run build -w @hero-factory/api && npm run build -w @hero-factory/web",
+    "dev": "npm run build -w @hero-factory/contracts && concurrently -n contracts,api,web -c cyan,magenta,blue \"npm run dev -w @hero-factory/contracts\" \"npm run dev -w @hero-factory/api\" \"npm run dev -w @hero-factory/web\"",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare:codegen": "npm run build -w @hero-factory/contracts && npm run db:generate -w @hero-factory/api",
+    "typecheck": "npm run prepare:codegen && npm run typecheck --workspaces --if-present",
+    "test": "npm run test:unit",
+    "test:unit": "npm run prepare:codegen && npm run test:unit --workspaces --if-present",
+    "test:integration": "npm run prepare:codegen && npm run test:integration -w @hero-factory/api",
+    "test:e2e": "npm run test:e2e -w @hero-factory/web",
+    "coverage": "npm run prepare:codegen && npm run coverage --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @hero-factory/api",
+    "db:seed": "npm run db:seed -w @hero-factory/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "concurrently": "9.2.4",
+    "eslint": "10.11.0",
+    "globals": "17.4.0",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  }
+}
