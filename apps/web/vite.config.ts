@@ -31,10 +31,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
-      include: [
-        'src/api/**/*.ts',
-        'src/features/heroes/api.ts',
-        'src/features/heroes/formatters.ts',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/test/**',
+        'src/App.tsx',
+        'src/main.tsx',
+        'src/theme.ts',
       ],
       thresholds: {
         lines: 80,

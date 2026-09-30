@@ -250,9 +250,12 @@ A CI usa essa segunda modalidade para validar a integração completa.
   Testing Library e MSW.
 - **E2E:** fluxo criar, visualizar, editar, inativar e reativar no Playwright.
 
-A meta de 80% se aplica ao código de negócio. Arquivos gerados, configuração e
-bootstrap não entram nessa conta porque aumentariam o número sem testar regras
-relevantes.
+A meta de 80% se aplica ao código escrito à mão que cada suíte unitária consegue
+exercitar de forma isolada. Na API, ela cobre aplicação, domínio e HTTP; o
+repositório Prisma fica na suíte de integração porque precisa do MySQL real. Na
+interface, ela cobre cliente HTTP, fluxo da tela, componentes, hooks e
+formatadores. Arquivos gerados, configuração, bootstrap e auxiliares de teste
+não entram nessa conta.
 
 O workflow de CI repete formatação, lint, tipos, cobertura, build, integração e
 E2E em ambiente limpo. Assim, “funciona na minha máquina” não é critério de
@@ -276,6 +279,7 @@ Esta seção registra **a decisão, o motivo e a consequência prática**. O obj
 | Exclusão lógica               | Um herói “excluído” precisa permanecer disponível para reativação.           | O registro recebe `is_active=false`; não há perda física de dados.                                                                                    |
 | `PUT` para edição             | O formulário envia o conjunto completo de campos editáveis.                  | A intenção de substituição fica clara e campos ausentes não são interpretados silenciosamente.                                                        |
 | `PATCH` para status           | A operação muda somente `is_active`.                                         | Ativar e inativar têm um contrato pequeno e idempotente.                                                                                              |
+| Bloqueio ao alterar status    | Duas requisições podem tentar mudar o mesmo herói ao mesmo tempo.            | A linha é bloqueada apenas durante essa alteração, evitando respostas divergentes sem adicionar fila ou serviço externo.                              |
 | Busca e paginação no servidor | A tela não pode depender apenas dos registros já carregados.                 | Contagem, filtro e páginas permanecem corretos à medida que o banco cresce.                                                                           |
 | Formato de data do contrato   | O formato `YYYY-MM-DD HH:mm:ss` faz parte da saída esperada.                 | Ele foi preservado mesmo que ISO 8601 seja mais comum em novas APIs.                                                                                  |
 | Docker Compose completo       | O avaliador precisa reproduzir o ambiente sem configurar MySQL manualmente.  | Um comando sobe banco, migration, seed, API e web.                                                                                                    |

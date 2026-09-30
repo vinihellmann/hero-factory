@@ -1,6 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import type { Hero, HeroInput } from '@hero-factory/contracts';
+import {
+  HEROES_PER_PAGE,
+  type Hero,
+  type HeroInput,
+  type HeroListResponse,
+} from '@hero-factory/contracts';
 import {
   Alert,
   Box,
@@ -52,9 +57,48 @@ export function HeroesPage() {
     placeholderData: keepPreviousData,
   });
 
+  function replaceHeroInCachedLists(hero: Hero) {
+    queryClient.setQueriesData<HeroListResponse>({ queryKey: heroKeys.lists() }, (current) =>
+      current
+        ? {
+            ...current,
+            data: current.data.map((item) => (item.id === hero.id ? hero : item)),
+          }
+        : current,
+    );
+  }
+
   const createMutation = useMutation({
     mutationFn: createHero,
-    onSuccess: async () => {
+    onSuccess: async (hero) => {
+      queryClient.setQueryData<HeroListResponse>(heroKeys.list(1, ''), (current) => {
+        if (!current) {
+          return {
+            data: [hero],
+            pagination: {
+              page: 1,
+              per_page: HEROES_PER_PAGE,
+              total: 1,
+              total_pages: 1,
+            },
+          };
+        }
+
+        const alreadyListed = current.data.some((item) => item.id === hero.id);
+        const total = current.pagination.total + (alreadyListed ? 0 : 1);
+
+        return {
+          data: [hero, ...current.data.filter((item) => item.id !== hero.id)].slice(
+            0,
+            current.pagination.per_page,
+          ),
+          pagination: {
+            ...current.pagination,
+            total,
+            total_pages: Math.ceil(total / current.pagination.per_page),
+          },
+        };
+      });
       setForm(null);
       setSearch('');
       setPage(1);
@@ -67,6 +111,7 @@ export function HeroesPage() {
     mutationFn: updateHero,
     onSuccess: async (hero) => {
       queryClient.setQueryData(heroKeys.detail(hero.id), hero);
+      replaceHeroInCachedLists(hero);
       setForm(null);
       await queryClient.invalidateQueries({ queryKey: heroKeys.all });
       setToast({ message: 'Herói atualizado com sucesso.', severity: 'success' });
@@ -80,6 +125,7 @@ export function HeroesPage() {
     },
     onSuccess: async (hero, command) => {
       queryClient.setQueryData(heroKeys.detail(hero.id), hero);
+      replaceHeroInCachedLists(hero);
       setConfirmation(null);
       await queryClient.invalidateQueries({ queryKey: heroKeys.all });
       setToast({

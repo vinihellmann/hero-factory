@@ -10,7 +10,8 @@ import { apiRequest } from '@/api/http';
 
 export const heroKeys = {
   all: ['heroes'] as const,
-  list: (page: number, search: string) => [...heroKeys.all, 'list', { page, search }] as const,
+  lists: () => [...heroKeys.all, 'list'] as const,
+  list: (page: number, search: string) => [...heroKeys.lists(), { page, search }] as const,
   detail: (id: string) => [...heroKeys.all, 'detail', id] as const,
 };
 

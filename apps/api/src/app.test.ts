@@ -18,16 +18,29 @@ const persistedHero: HeroEntity = {
   updatedAt: new Date('2026-01-01T10:00:00.000Z'),
 };
 
+const validPayload = {
+  name: 'Luna Valente',
+  nickname: 'Aurora',
+  date_of_birth: '1992-05-14',
+  universe: 'Horizonte Solar',
+  main_power: 'Manipulação de luz',
+  avatar_url: 'https://example.com/aurora.png',
+};
+
 describe('HTTP app', () => {
   let app: FastifyInstance;
   let databaseAvailable = true;
+  const list = vi.fn(() => Promise.resolve({ heroes: [] as HeroEntity[], total: 0 }));
+  const findById = vi.fn(() => Promise.resolve<HeroEntity | null>(null));
   const create = vi.fn(() => Promise.resolve(persistedHero));
+  const updateIfActive = vi.fn(() => Promise.resolve<HeroEntity | null>(null));
+  const setActive = vi.fn(() => Promise.resolve<HeroEntity | null>(null));
   const repository: HeroRepository = {
-    list: () => Promise.resolve({ heroes: [], total: 0 }),
-    findById: () => Promise.resolve(null),
+    list,
+    findById,
     create,
-    updateIfActive: () => Promise.resolve(null),
-    setActive: () => Promise.resolve(null),
+    updateIfActive,
+    setActive,
   };
 
   beforeAll(async () => {
@@ -68,17 +81,29 @@ describe('HTTP app', () => {
     }
   });
 
+  it('uses the default health check when a repository is supplied', async () => {
+    const appWithDefaultHealthCheck = await buildApp({ repository, logger: false });
+
+    try {
+      const health = await appWithDefaultHealthCheck.inject({ method: 'GET', url: '/health' });
+
+      expect(health.statusCode).toBe(200);
+      expect(health.json()).toEqual({ status: 'ok' });
+    } finally {
+      await appWithDefaultHealthCheck.close();
+    }
+  });
+
   it('normalizes valid input through the shared contract', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/heroes',
       payload: {
+        ...validPayload,
         name: '  Luna Valente  ',
         nickname: '  Aurora  ',
-        date_of_birth: '1992-05-14',
         universe: '  Horizonte Solar  ',
         main_power: '  Manipulação de luz  ',
-        avatar_url: 'https://example.com/aurora.png',
       },
     });
 
@@ -96,5 +121,78 @@ describe('HTTP app', () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json<ApiError>().error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('normalizes malformed JSON errors returned by Fastify', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/heroes',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"name":',
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json<ApiError>().error.code).toBe('REQUEST_ERROR');
+  });
+
+  it('serves the complete hero lifecycle through the HTTP routes', async () => {
+    const updatedHero = { ...persistedHero, nickname: 'Nova Aurora' };
+    const inactiveHero = { ...updatedHero, isActive: false };
+
+    list.mockResolvedValueOnce({ heroes: [persistedHero], total: 1 });
+    findById.mockResolvedValueOnce(persistedHero);
+    updateIfActive.mockResolvedValueOnce(updatedHero);
+    setActive.mockResolvedValueOnce(inactiveHero).mockResolvedValueOnce(updatedHero);
+
+    const collection = await app.inject({
+      method: 'GET',
+      url: '/api/heroes?page=1&search=Aurora',
+    });
+    const details = await app.inject({ method: 'GET', url: `/api/heroes/${persistedHero.id}` });
+    const update = await app.inject({
+      method: 'PUT',
+      url: `/api/heroes/${persistedHero.id}`,
+      payload: { ...validPayload, nickname: 'Nova Aurora' },
+    });
+    const deactivate = await app.inject({
+      method: 'DELETE',
+      url: `/api/heroes/${persistedHero.id}`,
+    });
+    const reactivate = await app.inject({
+      method: 'PATCH',
+      url: `/api/heroes/${persistedHero.id}/status`,
+      payload: { is_active: true },
+    });
+
+    expect(collection.json<{ data: Hero[]; pagination: { total: number } }>()).toMatchObject({
+      data: [{ nickname: 'Aurora' }],
+      pagination: { total: 1 },
+    });
+    expect(details.json<Hero>().id).toBe(persistedHero.id);
+    expect(update.json<Hero>().nickname).toBe('Nova Aurora');
+    expect(deactivate.json<Hero>().is_active).toBe(false);
+    expect(reactivate.json<Hero>().is_active).toBe(true);
+  });
+
+  it('returns the standard envelopes for missing routes and heroes', async () => {
+    const missingRoute = await app.inject({ method: 'GET', url: '/missing-route' });
+    const missingHero = await app.inject({
+      method: 'GET',
+      url: `/api/heroes/${persistedHero.id}`,
+    });
+
+    expect(missingRoute.statusCode).toBe(404);
+    expect(missingRoute.json<ApiError>().error.code).toBe('ROUTE_NOT_FOUND');
+    expect(missingHero.statusCode).toBe(404);
+    expect(missingHero.json<ApiError>().error.code).toBe('HERO_NOT_FOUND');
+  });
+
+  it('hides unexpected repository errors behind the standard envelope', async () => {
+    list.mockRejectedValueOnce('repository unavailable');
+
+    const response = await app.inject({ method: 'GET', url: '/api/heroes' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json<ApiError>().error.code).toBe('INTERNAL_ERROR');
   });
 });

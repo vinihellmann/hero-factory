@@ -129,6 +129,34 @@ describe('Heroes API with MySQL', () => {
     expect(activateResponse.json<Hero>().is_active).toBe(true);
   });
 
+  it('keeps concurrent status changes idempotent', async () => {
+    const hero = await prisma.hero.create({
+      data: {
+        name: 'Luna Valente',
+        nickname: 'Aurora',
+        dateOfBirth: new Date('1992-05-14T00:00:00.000Z'),
+        universe: 'Horizonte Solar',
+        mainPower: 'Manipulacao de luz',
+        avatarUrl: 'https://example.com/aurora.png',
+      },
+    });
+    const repository = new PrismaHeroRepository(prisma);
+
+    const deactivated = await Promise.all(
+      Array.from({ length: 5 }, () => repository.setActive(hero.id, false)),
+    );
+    const updatedAt = deactivated[0]?.updatedAt;
+    const repeated = await Promise.all(
+      Array.from({ length: 5 }, () => repository.setActive(hero.id, false)),
+    );
+
+    expect(deactivated.map((result) => result?.isActive)).toEqual(Array(5).fill(false));
+    expect(repeated.map((result) => result?.isActive)).toEqual(Array(5).fill(false));
+    expect(repeated.every((result) => result?.updatedAt.getTime() === updatedAt?.getTime())).toBe(
+      true,
+    );
+  });
+
   it('paginates, orders and searches without case or accent differences', async () => {
     await prisma.hero.createMany({
       data: Array.from({ length: 11 }, (_, index) => ({

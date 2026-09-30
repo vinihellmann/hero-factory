@@ -85,17 +85,17 @@ export class PrismaHeroRepository implements HeroRepository {
 
   public async setActive(id: string, isActive: boolean) {
     return this.prisma.$transaction(async (transaction) => {
+      const locked = await transaction.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM heroes WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) return null;
+
       const existing = await transaction.hero.findUnique({ where: { id } });
       if (existing === null) return null;
       if (existing.isActive === isActive) return toEntity(existing);
 
-      await transaction.hero.updateMany({
-        where: { id, isActive: existing.isActive },
-        data: { isActive },
-      });
-
-      const hero = await transaction.hero.findUnique({ where: { id } });
-      return hero === null ? null : toEntity(hero);
+      const hero = await transaction.hero.update({ where: { id }, data: { isActive } });
+      return toEntity(hero);
     });
   }
 }

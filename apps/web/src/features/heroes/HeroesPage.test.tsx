@@ -81,7 +81,22 @@ describe('tela de heróis', () => {
 
   it('valida e cria um herói pelo formulário compartilhado', async () => {
     const user = userEvent.setup();
+    let listCalls = 0;
     server.use(
+      http.get('*/api/heroes', () => {
+        listCalls += 1;
+        if (listCalls > 1) {
+          return HttpResponse.json(
+            { error: { code: 'INTERNAL_ERROR', message: 'Falha temporária.' } },
+            { status: 500 },
+          );
+        }
+
+        return HttpResponse.json({
+          data: [activeHero],
+          pagination: { page: 1, per_page: 10, total: 1, total_pages: 1 },
+        });
+      }),
       http.post('*/api/heroes', async ({ request }) => {
         const input = (await request.json()) as Record<string, string>;
         return HttpResponse.json(
@@ -115,7 +130,10 @@ describe('tela de heróis', () => {
     );
     await user.click(within(dialog).getByRole('button', { name: 'Criar herói' }));
 
-    expect(await screen.findByText('Herói criado com sucesso.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Herói criado com sucesso.', {}, { timeout: 4_000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Vendaval')).toBeInTheDocument();
   });
 
   it('expõe uma ação para tentar novamente quando a lista falha', async () => {
@@ -178,6 +196,10 @@ describe('tela de heróis', () => {
       await screen.findByText(/A lista pode estar desatualizada/, {}, { timeout: 4_000 }),
     ).toBeInTheDocument();
     expect(screen.getByText('Solaris')).toBeInTheDocument();
+    expect(screen.getByText('Inativo')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ver detalhes de Solaris, inativo' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument();
   });
 
@@ -204,7 +226,22 @@ describe('tela de heróis', () => {
 
   it('abre os detalhes e edita um herói ativo', async () => {
     const user = userEvent.setup();
+    let listCalls = 0;
     server.use(
+      http.get('*/api/heroes', () => {
+        listCalls += 1;
+        if (listCalls > 1) {
+          return HttpResponse.json(
+            { error: { code: 'INTERNAL_ERROR', message: 'Falha temporária.' } },
+            { status: 500 },
+          );
+        }
+
+        return HttpResponse.json({
+          data: [activeHero],
+          pagination: { page: 1, per_page: 10, total: 1, total_pages: 1 },
+        });
+      }),
       http.put('*/api/heroes/:id', async ({ request }) => {
         const input = (await request.json()) as Record<string, string>;
         return HttpResponse.json({
@@ -233,7 +270,10 @@ describe('tela de heróis', () => {
     await user.type(powerInput, 'Luz estelar');
     await user.click(within(editDialog).getByRole('button', { name: 'Salvar alterações' }));
 
-    expect(await screen.findByText('Herói atualizado com sucesso.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Herói atualizado com sucesso.', {}, { timeout: 4_000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Luz estelar')).toBeInTheDocument();
   });
 
   it('confirma a inativação e a reativação de um herói', async () => {
