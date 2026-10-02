@@ -10,7 +10,7 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
 const dateTimeFormatter = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short',
-  timeZone: 'UTC',
+  timeZone: 'America/Sao_Paulo',
 });
 
 export function formatBirthDate(value: string) {
@@ -23,7 +23,7 @@ export function formatBirthDate(value: string) {
 
 export function formatDateTime(value: string) {
   const date = new Date(`${value.replace(' ', 'T')}Z`);
-  return Number.isNaN(date.getTime()) ? '—' : `${dateTimeFormatter.format(date)} UTC`;
+  return Number.isNaN(date.getTime()) ? '—' : `${dateTimeFormatter.format(date)}`;
 }
 
 export function getInitials(value: string) {
